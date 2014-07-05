@@ -1,6 +1,6 @@
 var connect = require('../lib');
-var demand = require('must');
-var http = require('http');
+var demand  = require('must');
+var http    = require('http');
 
 function MockQuery(raw) {
   this.raw = raw;
@@ -35,13 +35,19 @@ describe('n4-connect', function () {
   });
 
   describe('when connected', function () {
-    var spyrq, spyrs, server, connection;
+    var spyrq, spyrs, spybody, server, connection;
 
     before(function () {
       server = http.createServer(function (req, res) {
         spyrq = req;
         spyrs = res;
-        res.end(200, "Received.");
+        spybody = '';
+        req.on('data', function (chunk) {
+          spybody += chunk;
+        });
+        req.on('end', function () {
+          res.end("Received.");
+        });
       }).listen(7474);
       connection = connect();
     });
@@ -50,9 +56,13 @@ describe('n4-connect', function () {
       server.close();
     });
 
-    describe('and given a query as a string', function () {
+    describe('and given a query', function () {
       it('should transmit that string to the database', function (done) {
-        done();
+        connection.query(new MockQuery("RETURN 42 AS solution"), function (err) {
+          if (err) { throw err; }
+          demand(JSON.parse(spybody).statements[0].statement).to.equal("RETURN 42 AS solution");
+          done();
+        });
       });
     });
   });
